@@ -1,80 +1,75 @@
 package com.dosssik.scenefromexamples.fragment
 
-import android.net.Uri
-import androidx.core.animation.doOnEnd
-import com.dosssik.scenefromexamples.R
-import com.google.ar.sceneform.Node
-import com.google.ar.sceneform.SceneView
-import com.google.ar.sceneform.animation.ModelAnimator
-import com.google.ar.sceneform.math.Vector3
-import com.google.ar.sceneform.rendering.ModelRenderable
-import kotlinx.android.synthetic.main.bone_connection_fragment.sceneView
-import kotlinx.android.synthetic.main.bone_connection_fragment.showOrHideConnectedNode
-import kotlinx.android.synthetic.main.bone_connection_fragment.startAnimation
-import java.io.File
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.fragment.app.Fragment
+import com.dosssik.scenefromexamples.databinding.BoneConnectionFragmentBinding
+import io.github.sceneview.SceneView
+import io.github.sceneview.nodes.ModelNode
 
-private const val BONE_NAME = "joint12"
 private const val HAT_SCALE = 0.25F
 private const val HAT_SHIFT_Y = 0.08F
-private const val PATH_TO_HAT = "//android_asset/baseball-cap.sfb"
 
-class BoneConnectionFragment: BaseSceneformFragment(R.layout.bone_connection_fragment) {
+class BoneConnectionFragment : Fragment() {
+    private var _binding: BoneConnectionFragmentBinding? = null
+    private val binding get() = _binding!!
+    private var modelNode: ModelNode? = null
+    private var hatNode: ModelNode? = null
 
-    private val hatNode = Node()
-
-    override fun getSceneView(): SceneView = sceneView
-
-    override fun onRenderableReady() {
-        loadHat()
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        _binding = BoneConnectionFragmentBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    private fun loadHat() {
-        val uri = Uri.fromFile(File(PATH_TO_HAT))
-        ModelRenderable.builder()
-            .setSource(activity, uri)
-            .build()
-            .thenAccept { renderable ->
-                connectHatToRobot(renderable)
-                enableButtons()
-            }
-            .exceptionally { throwable ->
-                throwable.printStackTrace()
-                null
-            }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        val sceneView = binding.sceneView
+        modelNode = ModelNode()
+        sceneView.addChild(modelNode!!)
+        modelNode?.loadModelGlbAsync(requireContext(), "robot.glb") {
+            addHat()
+            enableButtons()
+        }
     }
 
-    private fun connectHatToRobot(renderable: ModelRenderable) {
-        val boneNode = Node()
-        boneNode.setParent(robotNode)
-        robotNode.setBoneAttachment(BONE_NAME, boneNode)
-        hatNode.setParent(boneNode)
-        hatNode.renderable = renderable
-        hatNode.worldScale = Vector3(HAT_SCALE, HAT_SCALE, HAT_SCALE)
-        val position = hatNode.worldPosition
-        position.y -= HAT_SHIFT_Y
-        hatNode.worldPosition = position
+    private fun addHat() {
+        hatNode = ModelNode()
+        modelNode?.addChild(hatNode!!)
+        hatNode?.loadModelGlbAsync(requireContext(), "baseball-cap.glb") {
+            hatNode?.scale = HAT_SCALE
+            hatNode?.position = hatNode?.position?.apply { y -= HAT_SHIFT_Y } ?: return@loadModelGlbAsync
+        }
     }
 
     private fun enableButtons() {
-        startAnimation.isEnabled = true
-        startAnimation.setOnClickListener {
-            startAnimation()
+        binding.startAnimation.isEnabled = true
+        binding.startAnimation.setOnClickListener {
+            playRandomAnimation()
         }
-        showOrHideConnectedNode.isEnabled = true
-        showOrHideConnectedNode.setOnClickListener {
-            hatNode.isEnabled = hatNode.isEnabled.not()
+        binding.showOrHideConnectedNode.isEnabled = true
+        binding.showOrHideConnectedNode.setOnClickListener {
+            hatNode?.isVisible = hatNode?.isVisible?.not() ?: true
         }
     }
 
-    private fun startAnimation() {
-        startAnimation.isEnabled = false
-        val animationNumber = (0 until renderable.animationDataCount).random()
-        val animationData = renderable.getAnimationData(animationNumber)
-        val animator = ModelAnimator(animationData, renderable)
-        animator.start()
-
-        animator.doOnEnd {
-            startAnimation?.isEnabled = true
+    private fun playRandomAnimation() {
+        modelNode?.let { node ->
+            val animations = node.animations
+            if (animations.isNotEmpty()) {
+                val random = (animations.indices).random()
+                node.playAnimation(animations[random].name)
+            }
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

@@ -5,32 +5,28 @@ import android.os.Bundle
 import android.view.View
 import androidx.annotation.LayoutRes
 import androidx.fragment.app.Fragment
-import com.google.ar.sceneform.SceneView
-import com.google.ar.sceneform.SkeletonNode
-import com.google.ar.sceneform.collision.Ray
-import com.google.ar.sceneform.math.Quaternion
-import com.google.ar.sceneform.math.Vector3
-import com.google.ar.sceneform.rendering.ModelRenderable
+import io.github.sceneview.SceneView
+import io.github.sceneview.nodes.ModelNode
+import io.github.sceneview.math.Quaternion
+import io.github.sceneview.math.Vector3
 import java.io.File
 
 private const val MODEL_SCALE = 8F
 private const val CAMERA_FOV = 60F
 private const val MODEL_SHIFT_Y = 0.5f
-private const val PATH_TO_MODEL = "//android_asset/model.sfb"
+private const val PATH_TO_MODEL = "model.glb"
 
 abstract class BaseSceneformFragment(@LayoutRes layoutResId: Int) : Fragment(layoutResId) {
 
     open val needToRotate = true
-    val robotNode = SkeletonNode()
-
-    lateinit var renderable: ModelRenderable
+    val modelNode = ModelNode()
 
     abstract fun onRenderableReady()
     abstract fun getSceneView(): SceneView
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadRenderable()
+        loadModel()
     }
 
     override fun onResume() {
@@ -48,38 +44,27 @@ abstract class BaseSceneformFragment(@LayoutRes layoutResId: Int) : Fragment(lay
         super.onDestroyView()
     }
 
-    private fun loadRenderable() {
-        val uri = Uri.fromFile(File(PATH_TO_MODEL))
-        ModelRenderable.builder()
-            .setSource(activity, uri)
-            .build()
-            .thenAccept { renderable ->
-                this.renderable = renderable
-                showModel()
-                onRenderableReady()
-            }
-            .exceptionally { throwable ->
-                throwable.printStackTrace()
-                null
-            }
+    private fun loadModel() {
+        modelNode.loadModelGlbAsync(requireContext(), PATH_TO_MODEL) {
+            showModel()
+            onRenderableReady()
+        }
     }
 
     private fun showModel() {
         val camera = getSceneView().scene.camera
         camera.verticalFovDegrees = CAMERA_FOV
-        val ray = Ray(camera.worldPosition, camera.forward)
-        val position = ray.getPoint(1.0f)
+        val position = camera.worldPosition + camera.forward * 1.0f
         position.y -= MODEL_SHIFT_Y
 
-        robotNode.setParent(getSceneView().scene)
-        robotNode.worldPosition = position
-        robotNode.renderable = renderable
-        robotNode.worldScale = Vector3(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE)
+        modelNode.setParent(getSceneView().scene)
+        modelNode.worldPosition = position
+        modelNode.scale = MODEL_SCALE
 
         if (needToRotate) {
             val vectorY = Vector3(0f, 1f, 0f)
             val rotationY = Quaternion.axisAngle(vectorY, 180f)
-            robotNode.localRotation = rotationY
+            modelNode.localRotation = rotationY
         }
     }
 }

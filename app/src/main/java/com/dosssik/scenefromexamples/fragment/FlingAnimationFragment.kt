@@ -1,42 +1,41 @@
 package com.dosssik.scenefromexamples.fragment
 
-import android.view.GestureDetector
+import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
 import androidx.core.view.GestureDetectorCompat
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.dynamicanimation.animation.FlingAnimation
 import androidx.dynamicanimation.animation.FloatPropertyCompat
-import com.dosssik.scenefromexamples.R
-import com.google.ar.sceneform.Node
-import com.google.ar.sceneform.SceneView
-import com.google.ar.sceneform.math.Quaternion
-import com.google.ar.sceneform.math.Vector3
-import kotlinx.android.synthetic.main.fling_fragment.sceneView
+import androidx.fragment.app.Fragment
+import com.dosssik.scenefromexamples.databinding.FlingFragmentBinding
+import io.github.sceneview.math.Vector3
+import io.github.sceneview.math.Quaternion
+import io.github.sceneview.nodes.Node
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
-
 private const val SWIPE_THRESHOLD_VELOCITY: Float = 10F
 private const val ROTATION_FRICTION: Float = 3F
 
-class FlingAnimationFragment: BaseSceneformFragment(R.layout.fling_fragment) {
+class FlingAnimationFragment : Fragment() {
+    private var _binding: FlingFragmentBinding? = null
+    private val binding get() = _binding!!
 
-    override val needToRotate = false
     private var lastDeltaYAxisAngle: Float = 0F
     private val quaternion = Quaternion()
     private val rotateVector = Vector3.up()
-    private val gestureDetector = FlingGestureDetector()
-
     private lateinit var mDetector: GestureDetectorCompat
+    private val robotNode = Node()
 
     private val rotationProperty = object : FloatPropertyCompat<Node>("rotation") {
-
         override fun setValue(node: Node, value: Float) {
             node.localRotation = getRotationQuaternion(value)
         }
-
-        override fun getValue(card: Node): Float = card.localRotation.y
+        override fun getValue(node: Node): Float = node.localRotation.y
     }
 
     private val animation: FlingAnimation by lazy {
@@ -45,13 +44,22 @@ class FlingAnimationFragment: BaseSceneformFragment(R.layout.fling_fragment) {
         }
     }
 
-    override fun getSceneView(): SceneView = sceneView
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        _binding = FlingFragmentBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-    override fun onRenderableReady() {
-        mDetector = GestureDetectorCompat(activity, gestureDetector)
-        sceneView.setOnTouchListener { _, event ->
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        mDetector = GestureDetectorCompat(requireContext(), FlingGestureDetector())
+        binding.sceneView.setOnTouchListener { _, event ->
             mDetector.onTouchEvent(event)
         }
+        // binding.sceneView.addChild(robotNode) // Добавьте, если требуется
     }
 
     private fun getRotationQuaternion(deltaYAxisAngle: Float): Quaternion {
@@ -67,11 +75,10 @@ class FlingAnimationFragment: BaseSceneformFragment(R.layout.fling_fragment) {
         }
     }
 
-    inner class FlingGestureDetector : GestureDetector.SimpleOnGestureListener() {
-
+    inner class FlingGestureDetector : android.view.GestureDetector.SimpleOnGestureListener() {
         override fun onScroll(
-            e1: MotionEvent,
-            e2: MotionEvent,
+            e1: MotionEvent?,
+            e2: MotionEvent?,
             distanceX: Float,
             distanceY: Float
         ): Boolean {
@@ -81,8 +88,8 @@ class FlingAnimationFragment: BaseSceneformFragment(R.layout.fling_fragment) {
         }
 
         override fun onFling(
-            e1: MotionEvent,
-            e2: MotionEvent,
+            e1: MotionEvent?,
+            e2: MotionEvent?,
             velocityX: Float,
             velocityY: Float
         ): Boolean {
@@ -101,5 +108,10 @@ class FlingAnimationFragment: BaseSceneformFragment(R.layout.fling_fragment) {
             animation.setStartValue(lastDeltaYAxisAngle)
             animation.start()
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }
